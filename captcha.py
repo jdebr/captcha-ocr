@@ -39,11 +39,8 @@ def contourExample(image):
     
     ret,thresh = cv2.threshold(imgray,127,255,0)
     cvShow(thresh)
-    
-    edges = cv2.Canny(thresh, 100, 200)
-    cvShow(edges)
-    
-    img,contours,hierarchy = cv2.findContours(edges,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        
+    img,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
     cvShow(img)
     
     cImg = cv2.drawContours(image, contours, -1, (0,255,0), 2)
@@ -63,7 +60,7 @@ def train():
         img, contours,hierarchy = cv2.findContours(thresh,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
         
         for cnt in contours:
-            if cv2.contourArea(cnt) < 10000 and cv2.contourArea(cnt) > 350:
+            if cv2.contourArea(cnt) < 10000 and cv2.contourArea(cnt) > 200:
                 [x,y,w,h] = cv2.boundingRect(cnt)
                 cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),2)
                 roi = thresh[y:y+h,x:x+w]
@@ -89,9 +86,11 @@ def train():
     np.savetxt('responses.data',responses)
     
 def ocr():
-    #accuracy reporting
+    #local variables
     correct = 0
     total = 0
+    response_tuples = []
+    removal = []
     
     #training 
     samples = np.loadtxt('samples.data',np.float32)
@@ -108,9 +107,6 @@ def ocr():
         answer = a.group(1)
         print "Answer: " + answer
         
-        # Build response 
-        response_tuples = []
-        
         # Image Preprocessing
         path = TRAIN_DIR + filename
         image = cv2.imread(path)
@@ -120,27 +116,62 @@ def ocr():
         
         # OCR
         for cnt in contours:
-            if cv2.contourArea(cnt) < 10000 and cv2.contourArea(cnt) > 350:
+            if cv2.contourArea(cnt) < 10000 and cv2.contourArea(cnt) > 200:
+                #bounding rectangle
                 [x,y,w,h] = cv2.boundingRect(cnt)
                 cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),2)
+                #cut out same area from threshold image for ocr
                 roi = thresh[y:y+h,x:x+w]
                 roismall = cv2.resize(roi,(20,20))
                 roismall = roismall.reshape((1,400))
                 roismall = np.float32(roismall)
+                #KNN
                 retval, results, neigh_resp, dists = model.findNearest(roismall, 3)
+                #convert response back to character
                 letter = chr(int((results[0][0])))
-                response_tuples.append((letter, x))
+                #save letter and position data together for post processing
+                response_tuples.append((letter, x, y, w, h))
         
+        # Remove sub-contours when they are surrounded by a larger contour 
+        for i in range(0, len(response_tuples)):
+            for j in range(0, len(response_tuples)):
+                if i != j:
+                    # X and Y coordinates of each bounding rectangle 
+                    ix1 = response_tuples[i][1]
+                    ix2 = ix1 + response_tuples[i][3]
+                    iy1 = response_tuples[i][2]
+                    iy2 = iy1 + response_tuples[i][4]
+                    jx1 = response_tuples[j][1]
+                    jx2 = ix1 + response_tuples[j][3]
+                    jy1 = response_tuples[j][2]
+                    jy2 = iy1 + response_tuples[j][4]
+                    
+                    #If response_tuple[i] is surrounded by another response, mark it for removal
+                    if ix1 > jx1 and ix2 < jx2 and iy1 > jy1 and iy2 < jy2:
+                        removal.append(i)
+                        
+        # removing...
+        indexes = list(set(removal)) # removes duplicate indexes
+        indexes = sorted(indexes, reverse=True)
+        for x in indexes:
+            del response_tuples[x]
+                    
         # Sort response based on X-position of contours
         response_sorted = sorted(response_tuples, key=lambda xpos: xpos[1])
         response = ""
-        for l in response_sorted:
-            response = response + l[0]
+        for ltr in response_sorted:
+            response = response + ltr[0]
             
+        # Print results 
         print "Response: " + response 
         total+=1
         if response == answer: 
             correct+=1
+            print "!!"
+            
+        # Clear lists
+        del response_tuples[:]
+        del removal[:]
             
     print "Correct: " + str(correct)
         
