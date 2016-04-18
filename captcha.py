@@ -34,6 +34,7 @@ def canny(image):
 
 # FIND AND SHOW CONTOURS OF IMAGE
 def contourExample(image):
+    
     imgray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
     cvShow(imgray)
     
@@ -43,8 +44,10 @@ def contourExample(image):
     img,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
     cvShow(img)
     
-    cImg = cv2.drawContours(image, contours, -1, (0,255,0), 2)
-    cvShow(cImg)
+    for cnt in contours:
+        blank = cv2.imread('blankcanvas.jpg')
+        cImg = cv2.drawContours(blank, [cnt], 0, (0,0,0), 1)
+        cvShow(cImg)
     
 # Collect training data by labeling images
 def train():
@@ -62,8 +65,17 @@ def train():
         for cnt in contours:
             if cv2.contourArea(cnt) < 10000 and cv2.contourArea(cnt) > 200:
                 [x,y,w,h] = cv2.boundingRect(cnt)
-                cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),2)
+                cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),1)
                 roi = thresh[y:y+h,x:x+w]
+                
+                # ATTEMPT TO SAVE ONLY CONTOUR AS FEATURES
+                #blank = cv2.imread('blankcanvas.jpg')
+                #cImg = cv2.drawContours(blank, [cnt], 0, (0,0,0), 1)
+                #gray = cv2.cvtColor(cImg,cv2.COLOR_BGR2GRAY)
+                #ret,thresh = cv2.threshold(gray,127,255,0)
+                #roi = thresh[y:y+h,x:x+w]
+                # #####################
+                
                 roismall = cv2.resize(roi,(20,20))
                 cv2.imshow('train',image)
                 key = cv2.waitKey(0)
@@ -119,14 +131,23 @@ def ocr():
             if cv2.contourArea(cnt) < 10000 and cv2.contourArea(cnt) > 200:
                 #bounding rectangle
                 [x,y,w,h] = cv2.boundingRect(cnt)
-                cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),2)
+                
                 #cut out same area from threshold image for ocr
                 roi = thresh[y:y+h,x:x+w]
+                
+                # ATTEMPT TO SAVE ONLY CONTOUR AS FEATURES
+                #blank = cv2.imread('blankcanvas.jpg')
+                #cImg = cv2.drawContours(blank, [cnt], 0, (0,0,0), 1)
+                #gray = cv2.cvtColor(cImg,cv2.COLOR_BGR2GRAY)
+                #ret,thresh = cv2.threshold(gray,127,255,0)
+                #roi = thresh[y:y+h,x:x+w]
+                # #####################
+                
                 roismall = cv2.resize(roi,(20,20))
                 roismall = roismall.reshape((1,400))
                 roismall = np.float32(roismall)
                 #KNN
-                retval, results, neigh_resp, dists = model.findNearest(roismall, 3)
+                retval, results, neigh_resp, dists = model.findNearest(roismall, 9)
                 #convert response back to character
                 letter = chr(int((results[0][0])))
                 #save letter and position data together for post processing
@@ -180,7 +201,7 @@ def main():
     #canny(im3)
     
     #im = cv2.imread('train/apdh.jpg')
-    #ontourExample(im)
+    #contourExample(im)
     
     #train()
     ocr()
