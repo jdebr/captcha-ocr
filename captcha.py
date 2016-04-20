@@ -32,7 +32,7 @@ def canny(image):
     plt.title('Canny Edges'),plt.xticks([]),plt.yticks([])
     plt.show()
 
-# FIND AND SHOW CONTOURS OF IMAGE
+# FIND AND SHOW CONTOURS OF IMAGE USING ROTATED RECTANGLES
 def contourExample(image):
     
     imgray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
@@ -45,10 +45,14 @@ def contourExample(image):
     cvShow(img)
     
     for cnt in contours:
-        blank = cv2.imread('blankcanvas.jpg')
-        cImg = cv2.drawContours(blank, [cnt], 0, (0,0,0), 1)
-        cvShow(cImg)
-    
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        cv2.drawContours(image, [box], 0, (0,0,255),2)
+        cvShow(image)
+        
+      
+
 # Collect training data by labeling images
 def train():
 
@@ -147,7 +151,7 @@ def ocr():
                 roismall = roismall.reshape((1,400))
                 roismall = np.float32(roismall)
                 #KNN
-                retval, results, neigh_resp, dists = model.findNearest(roismall, 9)
+                retval, results, neigh_resp, dists = model.findNearest(roismall, 5)
                 #convert response back to character
                 letter = chr(int((results[0][0])))
                 #save letter and position data together for post processing
@@ -197,12 +201,12 @@ def ocr():
     print "Correct: " + str(correct)
         
 def main():
-    #cvShow(im)
-    #canny(im3)
     
     #im = cv2.imread('train/apdh.jpg')
-    #contourExample(im)
     
+    #contourExample(im)
+    #cvShow(im)
+    #canny()
     #train()
     ocr()
 
