@@ -6,6 +6,7 @@ import cv2
 from matplotlib import pyplot as plt
 
 TRAIN_DIR = "train/"
+TEST_DIR = "test/"
 PATTERN = re.compile(r'(\D+)\.jpg')
 
 # SHOW IMAGE WITH CV2
@@ -58,8 +59,16 @@ def train():
 
     samples = np.empty((0,400)) 
     responses = []
+    max_h = 0
+    max_w = 0
+    min_h = 200 
+    min_w = 200 
+    tot_h = 0
+    tot_w = 0
+    size = 0
 
     for filename in os.listdir(TRAIN_DIR):
+        print filename 
         path = TRAIN_DIR + filename
         image = cv2.imread(path)
         gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
@@ -93,6 +102,13 @@ def train():
                     responses.append(int(key))
                     sample = roismall.reshape((1,400))
                     samples = np.append(samples,sample,0)
+                    if h > max_h: max_h = h 
+                    if h < min_h: min_h = h 
+                    if w > max_w: max_w = w 
+                    if w < min_w: min_w = w 
+                    tot_h += h 
+                    tot_w += w 
+                    size += 1 
                     
     cv2.destroyAllWindows()
     responses = np.array(responses,np.float32)
@@ -101,10 +117,27 @@ def train():
     np.savetxt('samples.data',samples)
     np.savetxt('responses.data',responses)
     
+    print "Max H"
+    print max_h 
+    print "Min H"
+    print min_h 
+    print "Max W" 
+    print max_w 
+    print "Min W"
+    print min_w 
+    print "Total H"
+    print tot_h 
+    print "Total W"
+    print tot_w 
+    print "Samples"
+    print size 
+    
 def ocr():
     #local variables
     correct = 0
     total = 0
+    letters_correct = 0
+    letters_incorrect = 0
     response_tuples = []
     removal = []
     
@@ -117,14 +150,14 @@ def ocr():
     model.train(samples,cv2.ml.ROW_SAMPLE,responses)
     
     #testing
-    for filename in os.listdir(TRAIN_DIR):
+    for filename in os.listdir(TEST_DIR):
         # Determine answer from filename 
         a = PATTERN.match(filename)
         answer = a.group(1)
         print "Answer: " + answer
         
         # Image Preprocessing
-        path = TRAIN_DIR + filename
+        path = TEST_DIR + filename
         image = cv2.imread(path)
         gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
         ret,thresh = cv2.threshold(gray,127,255,0)
@@ -151,7 +184,7 @@ def ocr():
                 roismall = roismall.reshape((1,400))
                 roismall = np.float32(roismall)
                 #KNN
-                retval, results, neigh_resp, dists = model.findNearest(roismall, 5)
+                retval, results, neigh_resp, dists = model.findNearest(roismall, 3)
                 #convert response back to character
                 letter = chr(int((results[0][0])))
                 #save letter and position data together for post processing
@@ -194,11 +227,18 @@ def ocr():
             correct+=1
             print "!!"
             
+        for i in range (min(len(answer),len(response))):
+            if response[i] == answer[i]:
+                letters_correct += 1
+            else: letters_incorrect += 1
+            
         # Clear lists
         del response_tuples[:]
         del removal[:]
             
     print "Correct: " + str(correct)
+    print "Letters correct: " + str(letters_correct)
+    print "Letters incorrect: " + str(letters_incorrect)
         
 def main():
     
